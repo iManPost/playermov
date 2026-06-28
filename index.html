@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0a0a0f">
+<title>🎬 HLS Player</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.7/hls.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #13131a;
+    --surface2: #1c1c28;
+    --accent: #e50914;
+    --accent2: #ff6b35;
+    --text: #f0f0f5;
+    --muted: #7a7a9a;
+    --border: #2a2a3a;
+    --card-hover: #20202e;
+    --playing: #e50914;
+  }
+
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', 'Noto Sans Thai', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── HEADER ── */
+  header {
+    background: linear-gradient(180deg, #000 0%, transparent 100%);
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(10px);
+  }
+  header .logo {
+    font-size: 1.25rem;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  header .count {
+    margin-left: auto;
+    font-size: .78rem;
+    color: var(--muted);
+    background: var(--surface2);
+    padding: 3px 10px;
+    border-radius: 20px;
+  }
+
+  /* ── LAYOUT ── */
+  .layout {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── VIDEO WRAPPER ── */
+  .video-wrapper {
+    position: relative;
+    background: #000;
+    width: 100%;
+    aspect-ratio: 16/9;
+  }
+  video {
+    width: 100%;
+    height: 100%;
+    display: block;
+    background: #000;
+    outline: none;
+  }
+
+  /* overlay controls */
+  .overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    opacity: 0;
+    transition: opacity .25s;
+    background: linear-gradient(180deg, rgba(0,0,0,.55) 0%, transparent 30%, transparent 65%, rgba(0,0,0,.75) 100%);
+    pointer-events: none;
+  }
+  .video-wrapper:hover .overlay,
+  .video-wrapper.show-ctrl .overlay { opacity: 1; pointer-events: all; }
+
+  .overlay-top {
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .now-title {
+    font-size: .85rem;
+    font-weight: 600;
+    text-shadow: 0 1px 4px rgba(0,0,0,.8);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 80%;
+  }
+
+  .overlay-mid {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 24px;
+  }
+  .ctrl-btn {
+    background: rgba(0,0,0,.55);
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    border-radius: 50%;
+    width: 48px; height: 48px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.2rem;
+    transition: background .15s, transform .1s;
+    backdrop-filter: blur(4px);
+  }
+  .ctrl-btn:active { transform: scale(.88); }
+  .ctrl-btn.play-btn { width: 60px; height: 60px; font-size: 1.6rem; background: rgba(229,9,20,.75); }
+  .ctrl-btn:hover { background: rgba(229,9,20,.6); }
+
+  .overlay-bottom {
+    padding: 6px 14px 10px;
+  }
+  .progress-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .progress-wrap {
+    flex: 1;
+    height: 5px;
+    background: rgba(255,255,255,.2);
+    border-radius: 3px;
+    cursor: pointer;
+    position: relative;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 3px;
+    width: 0%;
+    transition: width .1s linear;
+  }
+  .progress-wrap::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translate(50%,-50%);
+    width: 13px; height: 13px;
+    background: #fff;
+    border-radius: 50%;
+    box-shadow: 0 0 4px rgba(0,0,0,.5);
+    display: none;
+  }
+  .progress-wrap:hover::after { display: block; }
+
+  .time-txt { font-size: .72rem; color: rgba(255,255,255,.85); min-width: 80px; text-align: right; }
+
+  .bottom-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .icon-btn {
+    background: none;
+    border: none;
+    color: rgba(255,255,255,.85);
+    cursor: pointer;
+    font-size: 1.1rem;
+    padding: 5px;
+    border-radius: 6px;
+    display: flex; align-items: center;
+    transition: color .15s;
+  }
+  .icon-btn:hover { color: #fff; }
+  .spacer { flex: 1; }
+
+  /* volume */
+  .vol-row { display: flex; align-items: center; gap: 6px; }
+  input[type=range].vol-slider {
+    -webkit-appearance: none;
+    width: 70px; height: 4px;
+    background: rgba(255,255,255,.3);
+    border-radius: 2px;
+    outline: none;
+  }
+  input[type=range].vol-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px; height: 12px;
+    background: #fff;
+    border-radius: 50%;
+  }
+
+  /* spinner */
+  .spinner {
+    position: absolute;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+  .spinner.active { display: flex; }
+  .spin-ring {
+    width: 44px; height: 44px;
+    border: 4px solid rgba(255,255,255,.15);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* error msg */
+  .err-msg {
+    position: absolute;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 8px;
+    background: rgba(0,0,0,.7);
+    font-size: .9rem;
+    color: var(--accent);
+    text-align: center;
+    padding: 20px;
+  }
+  .err-msg.active { display: flex; }
+
+  /* ── URL INPUT ── */
+  .url-section {
+    padding: 12px 14px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .url-section label { font-size: .75rem; color: var(--muted); white-space: nowrap; }
+  .url-section input {
+    flex: 1;
+    min-width: 160px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 7px 10px;
+    border-radius: 8px;
+    font-size: .82rem;
+    outline: none;
+  }
+  .url-section input:focus { border-color: var(--accent); }
+  .url-section button {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-size: .82rem;
+    cursor: pointer;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .url-section button:hover { background: #c0070f; }
+
+  /* ── REFERRER NOTE ── */
+  .ref-note {
+    font-size: .7rem;
+    color: var(--muted);
+    padding: 4px 14px 2px;
+    background: var(--surface);
+  }
+
+  /* ── PLAYLIST ── */
+  .playlist-section {
+    padding: 10px 14px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+  .playlist-section h2 {
+    font-size: .8rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    margin-bottom: 10px;
+  }
+  .playlist {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .pl-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 10px;
+    border-radius: 10px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: background .15s, border-color .15s;
+    background: var(--surface2);
+  }
+  .pl-item:hover { background: var(--card-hover); border-color: var(--border); }
+  .pl-item.active { border-color: var(--accent); background: rgba(229,9,20,.08); }
+
+  .pl-thumb {
+    width: 52px;
+    height: 74px;
+    border-radius: 6px;
+    object-fit: cover;
+    background: var(--border);
+    flex-shrink: 0;
+  }
+  .pl-info { flex: 1; overflow: hidden; }
+  .pl-name {
+    font-size: .88rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.3;
+  }
+  .pl-group {
+    font-size: .72rem;
+    color: var(--muted);
+    margin-top: 3px;
+  }
+  .pl-badge {
+    font-size: .65rem;
+    font-weight: 700;
+    background: var(--accent);
+    color: #fff;
+    padding: 2px 7px;
+    border-radius: 4px;
+    display: none;
+  }
+  .pl-item.active .pl-badge { display: inline; }
+
+  /* ── REMOTE KEYS (Android / TV) ── */
+  .remote-hint {
+    padding: 8px 14px;
+    font-size: .7rem;
+    color: var(--muted);
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    border-top: 1px solid var(--border);
+  }
+  .remote-hint span { display: flex; align-items: center; gap: 4px; }
+  .kbd {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-size: .65rem;
+    font-family: monospace;
+  }
+
+  /* ── LANDSCAPE (phone) ── */
+  @media (max-width: 768px) and (orientation: landscape) {
+    .layout {
+      flex-direction: row;
+      height: 100dvh;
+    }
+    .video-wrapper {
+      flex: 1;
+      aspect-ratio: unset;
+      height: 100dvh;
+    }
+    .side-panel {
+      width: 240px;
+      overflow-y: auto;
+      flex-shrink: 0;
+      border-left: 1px solid var(--border);
+    }
+    header { display: none; }
+  }
+
+  /* ── PORTRAIT mobile ── */
+  @media (max-width: 600px) {
+    .ctrl-btn { width: 42px; height: 42px; font-size: 1rem; }
+    .ctrl-btn.play-btn { width: 52px; height: 52px; font-size: 1.3rem; }
+    input[type=range].vol-slider { width: 50px; }
+    .pl-thumb { width: 44px; height: 62px; }
+  }
+
+  /* ── DESKTOP ── */
+  @media (min-width: 900px) {
+    .layout { flex-direction: row; align-items: flex-start; }
+    .video-col { flex: 1; position: sticky; top: 56px; }
+    .side-panel { width: 320px; flex-shrink: 0; }
+    .video-wrapper { aspect-ratio: 16/9; }
+  }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* fullscreen */
+  :fullscreen .overlay, :-webkit-full-screen .overlay { opacity: 1; }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="logo">🎬 HLS Player</span>
+  <span class="count" id="plCount">0 รายการ</span>
+</header>
+
+<div class="layout">
+  <!-- Video Column -->
+  <div class="video-col">
+    <div class="video-wrapper" id="vwrap">
+      <video id="vid" playsinline preload="metadata"></video>
+
+      <!-- Spinner -->
+      <div class="spinner" id="spinner"><div class="spin-ring"></div></div>
+
+      <!-- Error -->
+      <div class="err-msg" id="errMsg">
+        <span style="font-size:2rem">⚠️</span>
+        <span id="errTxt">ไม่สามารถเล่นวิดีโอได้</span>
+        <small style="color:var(--muted);font-size:.72rem">ลอง referrer หรือ URL อื่น</small>
+      </div>
+
+      <!-- Overlay Controls -->
+      <div class="overlay" id="overlay">
+        <div class="overlay-top">
+          <span class="now-title" id="nowTitle">เลือกวิดีโอจากรายการ</span>
+        </div>
+        <div class="overlay-mid">
+          <button class="ctrl-btn" id="btnPrev" title="ก่อนหน้า">⏮</button>
+          <button class="ctrl-btn play-btn" id="btnPlay" title="เล่น/หยุด">▶</button>
+          <button class="ctrl-btn" id="btnNext" title="ถัดไป">⏭</button>
+        </div>
+        <div class="overlay-bottom">
+          <div class="progress-row">
+            <div class="progress-wrap" id="progWrap">
+              <div class="progress-fill" id="progFill"></div>
+            </div>
+            <span class="time-txt" id="timeTxt">0:00 / 0:00</span>
+          </div>
+          <div class="bottom-row">
+            <button class="icon-btn" id="btnMute" title="ปิด/เปิดเสียง">🔊</button>
+            <div class="vol-row">
+              <input type="range" class="vol-slider" id="volSlider" min="0" max="1" step="0.05" value="1">
+            </div>
+            <span class="spacer"></span>
+            <button class="icon-btn" id="btnFS" title="เต็มจอ">⛶</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- URL Input -->
+    <div class="url-section">
+      <label>เพิ่ม URL:</label>
+      <input type="text" id="urlInput" placeholder="ชื่อวิดีโอ :: https://..." />
+      <button onclick="addUrl()">+ เพิ่ม</button>
+    </div>
+    <div class="ref-note">💡 รูปแบบ: <code>ชื่อ :: url</code> หรือ url เปล่า — Referrer: https://9.9nung.com/</div>
+
+    <!-- Remote hints -->
+    <div class="remote-hint">
+      <span><span class="kbd">Space</span> เล่น/หยุด</span>
+      <span><span class="kbd">←</span><span class="kbd">→</span> ←5s / +5s</span>
+      <span><span class="kbd">↑</span><span class="kbd">↓</span> เสียง</span>
+      <span><span class="kbd">N</span> ถัดไป</span>
+      <span><span class="kbd">P</span> ก่อนหน้า</span>
+      <span><span class="kbd">F</span> เต็มจอ</span>
+      <span><span class="kbd">M</span> ปิดเสียง</span>
+    </div>
+  </div>
+
+  <!-- Side Panel -->
+  <div class="side-panel">
+    <div class="playlist-section">
+      <h2>รายการ</h2>
+      <div class="playlist" id="playlist"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── DATA ──
+const REFERRER = 'https://9.9nung.com/';
+const items = [
+  {
+    name: 'Desert Warrior (2026) ซาวแทร็ค',
+    group: '🎬หนังใหม่2026',
+    logo: 'https://9.9nung.com/wp-content/uploads/2026/06/waxnw1NpzTPY5JkqWvu0muSopRJ-185x278.jpg',
+    url: 'https://media.vdohls.com/C-v4c0J_60kbd/playlist.m3u8'
+  },
+  {
+    name: 'คนเดือดระห่ำ 2026',
+    group: '🎬หนังใหม่2026',
+    logo: 'https://9.9nung.com/wp-content/uploads/2026/06/e5kRoQdDWWfs4xZOCmpiswbZRlS-185x278.jpg',
+    url: 'https://media.vdohls.com/Op7z3D_Fdg-DL/playlist.m3u8'
+  },
+  {
+    name: 'ฝ่าห้วงฝันสู่ 2026',
+    group: '🎬หนังใหม่2026',
+    logo: 'https://9.9nung.com/wp-content/uploads/2026/06/dKT6A7yQWxvRhZwX5uudHofvpja-185x278.jpg',
+    url: 'https://media.vdohls.com/E-JftGY_H5Upq/playlist.m3u8'
+  },
+  {
+    name: 'ฝันร้ายกลางทะเล 2026',
+    group: '🎬หนังใหม่2026',
+    logo: 'https://9.9nung.com/wp-content/uploads/2026/06/uJOW6pWxJ0i5sji9VXRR6Y1wXyE-185x278.jpg',
+    url: 'https://media.vdohls.com/w-O_js5PmLbea/playlist.m3u8'
+  }
+];
+
+// ── STATE ──
+let currentIdx = -1;
+let hls = null;
+let ctrlTimeout = null;
+
+const vid = document.getElementById('vid');
+const vwrap = document.getElementById('vwrap');
+const overlay = document.getElementById('overlay');
+const spinner = document.getElementById('spinner');
+const errMsg = document.getElementById('errMsg');
+const errTxt = document.getElementById('errTxt');
+const nowTitle = document.getElementById('nowTitle');
+const btnPlay = document.getElementById('btnPlay');
+const btnMute = document.getElementById('btnMute');
+const btnFS = document.getElementById('btnFS');
+const btnPrev = document.getElementById('btnPrev');
+const btnNext = document.getElementById('btnNext');
+const progFill = document.getElementById('progFill');
+const progWrap = document.getElementById('progWrap');
+const timeTxt = document.getElementById('timeTxt');
+const volSlider = document.getElementById('volSlider');
+const plEl = document.getElementById('playlist');
+const urlInput = document.getElementById('urlInput');
+const plCount = document.getElementById('plCount');
+
+// ── BUILD PLAYLIST ──
+function buildPlaylist() {
+  plEl.innerHTML = '';
+  items.forEach((item, i) => {
+    const div = document.createElement('div');
+    div.className = 'pl-item' + (i === currentIdx ? ' active' : '');
+    div.innerHTML = `
+      <img class="pl-thumb" src="${item.logo || ''}" onerror="this.src=''" alt="">
+      <div class="pl-info">
+        <div class="pl-name">${item.name}</div>
+        <div class="pl-group">${item.group || ''}</div>
+      </div>
+      <span class="pl-badge">กำลังเล่น</span>
+    `;
+    div.onclick = () => play(i);
+    plEl.appendChild(div);
+  });
+  plCount.textContent = items.length + ' รายการ';
+}
+
+// ── PLAY ──
+function play(idx) {
+  if (idx < 0 || idx >= items.length) return;
+  currentIdx = idx;
+  const item = items[idx];
+
+  errMsg.classList.remove('active');
+  spinner.classList.add('active');
+  nowTitle.textContent = item.name;
+  document.title = '▶ ' + item.name;
+
+  if (hls) { hls.destroy(); hls = null; }
+  vid.src = '';
+
+  if (Hls.isSupported()) {
+    hls = new Hls({
+      xhrSetup: xhr => {
+        // referrer header via proxy workaround (best-effort)
+        try { xhr.setRequestHeader('Referer', REFERRER); } catch(e) {}
+      }
+    });
+    hls.loadSource(item.url);
+    hls.attachMedia(vid);
+    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      spinner.classList.remove('active');
+      vid.play().catch(() => {});
+    });
+    hls.on(Hls.Events.ERROR, (_, data) => {
+      if (data.fatal) {
+        spinner.classList.remove('active');
+        errTxt.textContent = 'HLS Error: ' + (data.details || 'ไม่สามารถโหลดได้');
+        errMsg.classList.add('active');
+      }
+    });
+  } else if (vid.canPlayType('application/vnd.apple.mpegurl')) {
+    // Safari / iOS native HLS
+    vid.src = item.url;
+    vid.load();
+    vid.play().catch(() => {});
+    spinner.classList.remove('active');
+  } else {
+    spinner.classList.remove('active');
+    errTxt.textContent = 'เบราว์เซอร์ไม่รองรับ HLS';
+    errMsg.classList.add('active');
+  }
+
+  buildPlaylist();
+  showCtrl();
+}
+
+// ── CONTROLS ──
+function showCtrl() {
+  vwrap.classList.add('show-ctrl');
+  clearTimeout(ctrlTimeout);
+  ctrlTimeout = setTimeout(() => vwrap.classList.remove('show-ctrl'), 3500);
+}
+
+vwrap.addEventListener('touchstart', showCtrl, { passive: true });
+vwrap.addEventListener('mousemove', showCtrl);
+
+btnPlay.onclick = () => { vid.paused ? vid.play() : vid.pause(); showCtrl(); };
+btnMute.onclick = () => { vid.muted = !vid.muted; updateMute(); };
+btnPrev.onclick = () => play(currentIdx - 1);
+btnNext.onclick = () => play(currentIdx + 1);
+
+// double-tap for mobile seek
+let lastTap = 0;
+vwrap.addEventListener('touchend', e => {
+  const now = Date.now();
+  if (now - lastTap < 280) {
+    const rect = vwrap.getBoundingClientRect();
+    const x = e.changedTouches[0].clientX - rect.left;
+    if (x < rect.width * 0.35) { vid.currentTime -= 10; showCtrl(); }
+    else if (x > rect.width * 0.65) { vid.currentTime += 10; showCtrl(); }
+    else { vid.paused ? vid.play() : vid.pause(); }
+  }
+  lastTap = now;
+}, { passive: true });
+
+// Volume
+volSlider.oninput = () => { vid.volume = parseFloat(volSlider.value); vid.muted = false; updateMute(); };
+
+function updateMute() {
+  btnMute.textContent = (vid.muted || vid.volume === 0) ? '🔇' : vid.volume < .4 ? '🔈' : '🔊';
+}
+
+// Fullscreen
+btnFS.onclick = () => {
+  if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+    (vwrap.requestFullscreen || vwrap.webkitRequestFullscreen).call(vwrap);
+  } else {
+    (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+  }
+};
+
+// Progress
+vid.addEventListener('timeupdate', () => {
+  if (!vid.duration) return;
+  const p = (vid.currentTime / vid.duration) * 100;
+  progFill.style.width = p + '%';
+  timeTxt.textContent = fmt(vid.currentTime) + ' / ' + fmt(vid.duration);
+});
+
+progWrap.addEventListener('click', e => {
+  if (!vid.duration) return;
+  const rect = progWrap.getBoundingClientRect();
+  vid.currentTime = ((e.clientX - rect.left) / rect.width) * vid.duration;
+});
+
+// touch scrub
+progWrap.addEventListener('touchmove', e => {
+  if (!vid.duration) return;
+  e.preventDefault();
+  const rect = progWrap.getBoundingClientRect();
+  const x = Math.min(Math.max(e.touches[0].clientX - rect.left, 0), rect.width);
+  vid.currentTime = (x / rect.width) * vid.duration;
+}, { passive: false });
+
+vid.addEventListener('play', () => { btnPlay.textContent = '⏸'; });
+vid.addEventListener('pause', () => { btnPlay.textContent = '▶'; });
+vid.addEventListener('waiting', () => spinner.classList.add('active'));
+vid.addEventListener('playing', () => spinner.classList.remove('active'));
+vid.addEventListener('ended', () => { if (currentIdx + 1 < items.length) play(currentIdx + 1); });
+vid.addEventListener('volumechange', updateMute);
+
+function fmt(s) {
+  if (!isFinite(s)) return '0:00';
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = Math.floor(s % 60);
+  return h ? `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}` : `${m}:${String(sec).padStart(2,'0')}`;
+}
+
+// ── KEYBOARD / REMOTE ──
+document.addEventListener('keydown', e => {
+  const tag = document.activeElement.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+  switch(e.key) {
+    case ' ': case 'k': e.preventDefault(); vid.paused ? vid.play() : vid.pause(); break;
+    case 'ArrowRight': case 'MediaFastForward': vid.currentTime += 5; break;
+    case 'ArrowLeft': case 'MediaRewind': vid.currentTime -= 5; break;
+    case 'ArrowUp': vid.volume = Math.min(1, vid.volume + .1); volSlider.value = vid.volume; break;
+    case 'ArrowDown': vid.volume = Math.max(0, vid.volume - .1); volSlider.value = vid.volume; break;
+    case 'n': case 'N': case 'MediaTrackNext': play(currentIdx + 1); break;
+    case 'p': case 'P': case 'MediaTrackPrevious': play(currentIdx - 1); break;
+    case 'f': case 'F': btnFS.click(); break;
+    case 'm': case 'M': case 'VolumeMute': vid.muted = !vid.muted; break;
+    case 'Enter': case 'MediaPlay': case 'MediaPause': vid.paused ? vid.play() : vid.pause(); break;
+  }
+  showCtrl();
+});
+
+// ── ADD URL ──
+function addUrl() {
+  const raw = urlInput.value.trim();
+  if (!raw) return;
+  let name = 'วิดีโอ ' + (items.length + 1);
+  let url = raw;
+  if (raw.includes('::')) {
+    const parts = raw.split('::');
+    name = parts[0].trim();
+    url = parts[1].trim();
+  }
+  items.push({ name, group: 'เพิ่มเอง', logo: '', url });
+  buildPlaylist();
+  urlInput.value = '';
+  // auto-play if nothing playing
+  if (currentIdx === -1) play(items.length - 1);
+}
+
+urlInput.addEventListener('keydown', e => { if (e.key === 'Enter') addUrl(); });
+
+// ── INIT ──
+buildPlaylist();
+</script>
+</body>
+</html>
