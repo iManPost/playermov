@@ -1167,5 +1167,101 @@ urlInput.addEventListener('keydown', e => { if (e.key === 'Enter') addUrl(); });
 // ── INIT ──
 buildPlaylist();
 </script>
+ <script>
+/* ==========================
+   ข้อมูลต้นฉบับ
+========================== */
+
+const PORTAL_URL = "https://playermov.iveenvon.workers.dev/";
+const MAC_ADDRESS = "00:11:22:33:44:55";
+
+/* ==========================
+   Base64
+========================== */
+
+const URL_BASE64 = "YUhSMGNEb3ZMMmx0WVc1d2IzTjBMbWRwZEdoMVlpNXBieTlwY0hSMmJtVjMv";
+const MAC_BASE64 = "MDA6MTE6MjI6MzM6NDQ6NTU=";
+
+/* ==========================
+   ถอดรหัส
+========================== */
+
+const CONFIG = {
+    p: atob(URL_BASE64),
+    m: atob(MAC_BASE64)
+};
+
+/* ==========================
+   ปิดคลิกขวา
+========================== */
+
+document.addEventListener("contextmenu", function(e){
+    e.preventDefault();
+    return false;
+});
+
+/* ==========================
+   ปิด F12 / DevTools Shortcut
+========================== */
+
+document.addEventListener("keydown", function(e){
+
+    if (
+        e.key === "F12" ||
+        (e.ctrlKey && e.shiftKey &&
+            ["I","J","C"].includes(e.key.toUpperCase())
+        ) ||
+        (e.ctrlKey && e.key.toUpperCase() === "U")
+    ){
+        e.preventDefault();
+        return false;
+    }
+
+});
+
+/* ==========================
+   ปิดลากรูป
+========================== */
+
+document.addEventListener("dragstart", function(e){
+    e.preventDefault();
+});
+
+/* ==========================
+   ปิดเลือกข้อความ
+========================== */
+
+document.addEventListener("selectstart", function(e){
+    e.preventDefault();
+});
+
+/* ==========================
+   ตรวจ DevTools
+========================== */
+
+setInterval(function(){
+
+    const widthThreshold =
+        window.outerWidth - window.innerWidth > 160;
+
+    const heightThreshold =
+        window.outerHeight - window.innerHeight > 160;
+
+    if(widthThreshold || heightThreshold){
+
+        document.body.innerHTML = `
+        <div style="
+            display:flex;
+            justify-content:center;
+            align-items:center;
+            height:100vh;
+            font-size:24px;
+            font-family:sans-serif;">
+            Access Denied
+        </div>`;
+    }
+
+},1000);
+</script>
 </body>
 </html>
