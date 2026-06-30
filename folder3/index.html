@@ -438,7 +438,7 @@
       <div class="err-msg" id="errMsg">
         <span style="font-size:2rem">⚠️</span>
         <span id="errTxt">ไม่สามารถเล่นวิดีโอได้</span>
-        <small style="color:var(--muted);font-size:.72rem">ลอง referrer หรือ URL อื่น</small>
+        <small style="color:var(--muted);font-size:.72rem">ลอง .m3u8 referrer หรือ URL อื่น</small>
       </div>
 
       <!-- Overlay Controls -->
@@ -472,11 +472,11 @@
 
     <!-- URL Input -->
     <div class="url-section">
-      <label>เพิ่ม URL:</label>
+      <label>เพิ่ม URL:.m3u8</label>
       <input type="text" id="urlInput" placeholder="ชื่อวิดีโอ :: https://..." />
       <button onclick="addUrl()">+ เพิ่ม</button>
     </div>
-    <div class="ref-note">💡 รูปแบบ: <code>ชื่อ :: url</code> หรือ url เปล่า — Referrer: Android'BOX Thai</div>
+    <div class="ref-note">💡 รูปแบบ:.m3u8 <code>ชื่อ :: url</code> หรือ url เปล่า — Referrer: Android'BOX Thai</div>
 
     <!-- Remote hints -->
     <div class="remote-hint">
@@ -504,7 +504,20 @@
 const REFERRER = 'https://9.9nung.com/';
 const items = [
 
+
+ {
+    name: 'ชื่อหนัง มันเด้งขึ้นมาแดก (2026) ',
+    group: '🎬หนังซีรีย2026',
+    logo: 'https://img.salehere.co.th/p/1200x0/2022/06/17/cuxoifggy7b4.jpg',
+    url: 'https://ezycdn.stream/playlist-6pgltt5j-master.m3u8'
+  },
     {
+    name: 'ชื่อหนัง มันเด้งขึ้นมาแดก (2026) ',
+    group: '🎬หนังใหม่2026',
+    logo: 'https://hd.movie285.com/wp-content/uploads/2026/06/5et5ymvz.jpg',
+    url: 'https://ezycdn.stream/playlist-6pgltt5j-master.m3u8'
+  },
+ {
     name: 'ซูเปอร์เกิร์ล (2026) ',
     group: '🎬หนังใหม่2026',
     logo: 'https://www.24hd.net/wp-content/uploads/2026/06/Supergirl-2026.webp',
